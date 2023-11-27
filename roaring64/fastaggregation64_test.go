@@ -3,9 +3,10 @@ package roaring64
 // to run just these tests: go test -run TestFastAggregations*
 
 import (
-	"github.com/stretchr/testify/assert"
 	"sort"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFastAggregationsAdvanced_run(t *testing.T) {

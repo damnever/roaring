@@ -112,17 +112,16 @@ func ParOr(parallelism int, bitmaps ...*Bitmap) *Bitmap {
 
 	result := Bitmap{
 		roaringArray64{
-			containers:      make([]*roaring.Bitmap, containerCount),
-			keys:            make([]uint32, containerCount),
-			needCopyOnWrite: make([]bool, containerCount),
+			containers: make([]*roaring.Bitmap, containerCount),
+			keys:       make([]uint32, containerCount),
 		},
+		false,
 	}
 
 	resultOffset := 0
 	for _, chunk := range chunks {
 		copy(result.highlowcontainer.containers[resultOffset:], chunk.containers)
 		copy(result.highlowcontainer.keys[resultOffset:], chunk.keys)
-		copy(result.highlowcontainer.needCopyOnWrite[resultOffset:], chunk.needCopyOnWrite)
 		resultOffset += chunk.size()
 	}
 
@@ -189,7 +188,7 @@ func orOnRange(ra1, ra2 *roaringArray64, start, last uint32) *roaringArray64 {
 				c1 := ra1.getContainerAtIndex(idx1)
 
 				//answer.appendContainer(key1, c1.lazyOR(ra2.getContainerAtIndex(idx2)), false)
-				answer.appendContainer(key1, roaring.Or(c1, ra2.getContainerAtIndex(idx2)), false)
+				answer.appendContainer(key1, roaring.Or(c1, ra2.getContainerAtIndex(idx2)))
 				idx1++
 				idx2++
 				if idx1 == length1 || idx2 == length2 {
@@ -250,7 +249,6 @@ func iorOnRange(ra1, ra2 *roaringArray64, start, last uint32) *roaringArray64 {
 				key1 = ra1.getKeyAtIndex(idx1)
 			} else if key1 > key2 {
 				ra1.insertNewKeyValueAt(idx1, key2, ra2.getContainerAtIndex(idx2))
-				ra1.needCopyOnWrite[idx1] = true
 				idx2++
 				idx1++
 				length1++
@@ -259,13 +257,12 @@ func iorOnRange(ra1, ra2 *roaringArray64, start, last uint32) *roaringArray64 {
 				}
 				key2 = ra2.getKeyAtIndex(idx2)
 			} else {
-				c1 := ra1.getWritableContainerAtIndex(idx1)
+				c1 := ra1.getContainerAtIndex(idx1)
 
 				//ra1.containers[idx1] = c1.lazyIOR(ra2.getContainerAtIndex(idx2))
 				c1.Or(ra2.getContainerAtIndex(idx2))
 				ra1.setContainerAtIndex(idx1, c1)
 
-				ra1.needCopyOnWrite[idx1] = false
 				idx1++
 				idx2++
 				if idx1 >= length1 || idx2 >= length2 {

@@ -475,8 +475,6 @@ func (ra *roaringArray) frozenView(buf []byte) error {
 
 	ra.keys = keys
 	ra.containers = containers
-	ra.needCopyOnWrite = needCOW
-	ra.copyOnWrite = true
 
 	return nil
 }

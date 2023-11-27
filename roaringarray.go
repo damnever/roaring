@@ -10,6 +10,8 @@ import (
 )
 
 type container interface {
+	Reset()
+
 	// addOffset returns the (low, high) parts of the shifted container.
 	// Whenever one of them would be empty, nil will be returned instead to
 	// avoid unnecessary allocations.
@@ -99,15 +101,21 @@ func rangeOfOnes(start, last int) container {
 	return newRunContainer16Range(uint16(start), uint16(last))
 }
 
+var _roaringArrayPool = internal.NewTypedPool(func() *roaringArray { return &roaringArray{} })
+
 type roaringArray struct {
-	keys            []uint16
-	containers      []container `msg:"-"` // don't try to serialize directly.
-	needCopyOnWrite []bool
-	copyOnWrite     bool
+	keys       []uint16
+	containers []container `msg:"-"` // don't try to serialize directly.
+	unsafe     bool
 }
 
 func newRoaringArray() *roaringArray {
-	return &roaringArray{}
+	return _roaringArrayPool.Get()
+}
+
+func (r *roaringArray) Reset() {
+	r.recycle(0, len(r.containers))
+	r.resize(0)
 }
 
 // runOptimize compresses the element containers to minimize space consumed.
@@ -123,35 +131,13 @@ func (ra *roaringArray) runOptimize() {
 	}
 }
 
-func (ra *roaringArray) appendContainer(key uint16, value container, mustCopyOnWrite bool) {
+func (ra *roaringArray) appendContainer(key uint16, value container) {
 	ra.keys = append(ra.keys, key)
 	ra.containers = append(ra.containers, value)
-	ra.needCopyOnWrite = append(ra.needCopyOnWrite, mustCopyOnWrite)
-}
-
-func (ra *roaringArray) appendWithoutCopy(sa roaringArray, startingindex int) {
-	mustCopyOnWrite := sa.needCopyOnWrite[startingindex]
-	ra.appendContainer(sa.keys[startingindex], sa.containers[startingindex], mustCopyOnWrite)
 }
 
 func (ra *roaringArray) appendCopy(sa roaringArray, startingindex int) {
-	// cow only if the two request it, or if we already have a lightweight copy
-	copyonwrite := (ra.copyOnWrite && sa.copyOnWrite) || sa.needsCopyOnWrite(startingindex)
-	if !copyonwrite {
-		// since there is no copy-on-write, we need to clone the container (this is important)
-		ra.appendContainer(sa.keys[startingindex], sa.containers[startingindex].clone(), copyonwrite)
-	} else {
-		ra.appendContainer(sa.keys[startingindex], sa.containers[startingindex], copyonwrite)
-		if !sa.needsCopyOnWrite(startingindex) {
-			sa.setNeedsCopyOnWrite(startingindex)
-		}
-	}
-}
-
-func (ra *roaringArray) appendWithoutCopyMany(sa roaringArray, startingindex, end int) {
-	for i := startingindex; i < end; i++ {
-		ra.appendWithoutCopy(sa, i)
-	}
+	ra.appendContainer(sa.keys[startingindex], sa.containers[startingindex].clone())
 }
 
 func (ra *roaringArray) appendCopyMany(sa roaringArray, startingindex, end int) {
@@ -161,32 +147,15 @@ func (ra *roaringArray) appendCopyMany(sa roaringArray, startingindex, end int) 
 }
 
 func (ra *roaringArray) appendCopiesUntil(sa roaringArray, stoppingKey uint16) {
-	// cow only if the two request it, or if we already have a lightweight copy
-	copyonwrite := ra.copyOnWrite && sa.copyOnWrite
-
 	for i := 0; i < sa.size(); i++ {
 		if sa.keys[i] >= stoppingKey {
 			break
 		}
-		thiscopyonewrite := copyonwrite || sa.needsCopyOnWrite(i)
-		if thiscopyonewrite {
-			ra.appendContainer(sa.keys[i], sa.containers[i], thiscopyonewrite)
-			if !sa.needsCopyOnWrite(i) {
-				sa.setNeedsCopyOnWrite(i)
-			}
-
-		} else {
-			// since there is no copy-on-write, we need to clone the container (this is important)
-			ra.appendContainer(sa.keys[i], sa.containers[i].clone(), thiscopyonewrite)
-
-		}
+		ra.appendContainer(sa.keys[i], sa.containers[i].clone())
 	}
 }
 
 func (ra *roaringArray) appendCopiesAfter(sa roaringArray, beforeStart uint16) {
-	// cow only if the two request it, or if we already have a lightweight copy
-	copyonwrite := ra.copyOnWrite && sa.copyOnWrite
-
 	startLocation := sa.getIndex(beforeStart)
 	if startLocation >= 0 {
 		startLocation++
@@ -195,17 +164,7 @@ func (ra *roaringArray) appendCopiesAfter(sa roaringArray, beforeStart uint16) {
 	}
 
 	for i := startLocation; i < sa.size(); i++ {
-		thiscopyonewrite := copyonwrite || sa.needsCopyOnWrite(i)
-		if thiscopyonewrite {
-			ra.appendContainer(sa.keys[i], sa.containers[i], thiscopyonewrite)
-			if !sa.needsCopyOnWrite(i) {
-				sa.setNeedsCopyOnWrite(i)
-			}
-		} else {
-			// since there is no copy-on-write, we need to clone the container (this is important)
-			ra.appendContainer(sa.keys[i], sa.containers[i].clone(), thiscopyonewrite)
-
-		}
+		ra.appendContainer(sa.keys[i], sa.containers[i].clone())
 	}
 }
 
@@ -216,71 +175,68 @@ func (ra *roaringArray) removeIndexRange(begin, end int) {
 
 	r := end - begin
 
+	ra.recycle(begin, end)
+
 	copy(ra.keys[begin:], ra.keys[end:])
 	copy(ra.containers[begin:], ra.containers[end:])
-	copy(ra.needCopyOnWrite[begin:], ra.needCopyOnWrite[end:])
 
 	ra.resize(len(ra.keys) - r)
 }
 
+func (ra *roaringArray) recycle(start, end int) { // end not included.
+
+	for i := start; i < end; i++ {
+		c := ra.containers[i]
+		ra.containers[i] = nil
+		c.Reset()
+		switch x := c.(type) {
+		case *arrayContainer:
+			_arrayContainerPool.Put(x)
+		case *bitmapContainer:
+			_bitmapContainerPool.Put(x)
+		case *runContainer16:
+			_runContainer16Pool.Put(x)
+		}
+	}
+}
+
 func (ra *roaringArray) resize(newsize int) {
 	for k := newsize; k < len(ra.containers); k++ {
+		ra.keys[k] = 0
 		ra.containers[k] = nil
 	}
 
 	ra.keys = ra.keys[:newsize]
 	ra.containers = ra.containers[:newsize]
-	ra.needCopyOnWrite = ra.needCopyOnWrite[:newsize]
 }
 
 func (ra *roaringArray) clear() {
-	ra.resize(0)
-	ra.copyOnWrite = false
+	ra.Reset()
 }
 
 func (ra *roaringArray) clone() *roaringArray {
-
-	sa := roaringArray{}
-	sa.copyOnWrite = ra.copyOnWrite
-
-	// this is where copyOnWrite is used.
-	if ra.copyOnWrite {
-		sa.keys = make([]uint16, len(ra.keys))
-		copy(sa.keys, ra.keys)
-		sa.containers = make([]container, len(ra.containers))
-		copy(sa.containers, ra.containers)
-		sa.needCopyOnWrite = make([]bool, len(ra.needCopyOnWrite))
-
-		ra.markAllAsNeedingCopyOnWrite()
-		sa.markAllAsNeedingCopyOnWrite()
-
-		// sa.needCopyOnWrite is shared
+	sa := _roaringArrayPool.GetNoCreate()
+	if sa != nil && cap(sa.keys) >= len(ra.keys) {
+		sa.keys = sa.keys[:len(ra.keys)]
+		sa.containers = sa.containers[:len(ra.containers)]
 	} else {
-		// make a full copy
-
-		sa.keys = make([]uint16, len(ra.keys))
-		copy(sa.keys, ra.keys)
-
-		sa.containers = make([]container, len(ra.containers))
-		for i := range sa.containers {
-			sa.containers[i] = ra.containers[i].clone()
+		if sa != nil {
+			_roaringArrayPool.Put(sa)
 		}
-
-		sa.needCopyOnWrite = make([]bool, len(ra.needCopyOnWrite))
+		sa = &roaringArray{}
+		sa.keys = make([]uint16, len(ra.keys))
+		sa.containers = make([]container, len(ra.containers))
 	}
-	return &sa
+
+	copy(sa.keys, ra.keys)
+	for i := range sa.containers {
+		sa.containers[i] = ra.containers[i].clone()
+	}
+	return sa
 }
 
-// clone all containers which have needCopyOnWrite set to true
-// This can be used to make sure it is safe to munmap a []byte
-// that the roaring array may still have a reference to.
-func (ra *roaringArray) cloneCopyOnWriteContainers() {
-	for i, needCopyOnWrite := range ra.needCopyOnWrite {
-		if needCopyOnWrite {
-			ra.containers[i] = ra.containers[i].clone()
-			ra.needCopyOnWrite[i] = false
-		}
-	}
+func (ra *roaringArray) Unsafe() bool {
+	return ra.unsafe
 }
 
 // unused function:
@@ -310,9 +266,7 @@ func (ra *roaringArray) getFastContainerAtIndex(i int, needsWriteable bool) cont
 			c = t.toBitmapContainer()
 		}
 	case *bitmapContainer:
-		if needsWriteable && ra.needCopyOnWrite[i] {
-			c = ra.containers[i].clone()
-		}
+		c = ra.containers[i].clone()
 	}
 	return c
 }
@@ -320,20 +274,8 @@ func (ra *roaringArray) getFastContainerAtIndex(i int, needsWriteable bool) cont
 // getUnionedWritableContainer switches behavior for in-place Or
 // depending on whether the container requires a copy on write.
 // If it does using the non-inplace or() method leads to fewer allocations.
-func (ra *roaringArray) getUnionedWritableContainer(pos int, other container) container {
-	if ra.needCopyOnWrite[pos] {
-		return ra.getContainerAtIndex(pos).or(other)
-	}
+func (ra *roaringArray) getUnionedContainer(pos int, other container) container {
 	return ra.getContainerAtIndex(pos).ior(other)
-
-}
-
-func (ra *roaringArray) getWritableContainerAtIndex(i int) container {
-	if ra.needCopyOnWrite[i] {
-		ra.containers[i] = ra.containers[i].clone()
-		ra.needCopyOnWrite[i] = false
-	}
-	return ra.containers[i]
 }
 
 func (ra *roaringArray) getIndex(x uint16) int {
@@ -358,10 +300,6 @@ func (ra *roaringArray) insertNewKeyValueAt(i int, key uint16, value container) 
 
 	ra.keys[i] = key
 	ra.containers[i] = value
-
-	ra.needCopyOnWrite = append(ra.needCopyOnWrite, false)
-	copy(ra.needCopyOnWrite[i+1:], ra.needCopyOnWrite[i:])
-	ra.needCopyOnWrite[i] = false
 }
 
 func (ra *roaringArray) remove(key uint16) bool {
@@ -374,10 +312,10 @@ func (ra *roaringArray) remove(key uint16) bool {
 }
 
 func (ra *roaringArray) removeAtIndex(i int) {
+	ra.recycle(i, i+1)
+
 	copy(ra.keys[i:], ra.keys[i+1:])
 	copy(ra.containers[i:], ra.containers[i+1:])
-
-	copy(ra.needCopyOnWrite[i:], ra.needCopyOnWrite[i+1:])
 
 	ra.resize(len(ra.keys) - 1)
 }
@@ -386,10 +324,9 @@ func (ra *roaringArray) setContainerAtIndex(i int, c container) {
 	ra.containers[i] = c
 }
 
-func (ra *roaringArray) replaceKeyAndContainerAtIndex(i int, key uint16, c container, mustCopyOnWrite bool) {
+func (ra *roaringArray) replaceKeyAndContainerAtIndex(i int, key uint16, c container) {
 	ra.keys[i] = key
 	ra.containers[i] = c
-	ra.needCopyOnWrite[i] = mustCopyOnWrite
 }
 
 func (ra *roaringArray) size() int {
@@ -567,7 +504,7 @@ func (ra *roaringArray) readFrom(stream internal.ByteInput, cookieHeader ...byte
 		}
 	}
 	// If NextReturnsSafeSlice is false, then willNeedCopyOnWrite should be true
-	willNeedCopyOnWrite := !stream.NextReturnsSafeSlice()
+	ra.unsafe = !stream.NextReturnsSafeSlice()
 
 	var size uint32
 	var isRunBitmap []byte
@@ -622,17 +559,10 @@ func (ra *roaringArray) readFrom(stream internal.ByteInput, cookieHeader ...byte
 		ra.keys = make([]uint16, size)
 	}
 
-	if cap(ra.needCopyOnWrite) >= int(size) {
-		ra.needCopyOnWrite = ra.needCopyOnWrite[:size]
-	} else {
-		ra.needCopyOnWrite = make([]bool, size)
-	}
-
 	for i := uint32(0); i < size; i++ {
 		key := keycard[2*i]
 		card := int(keycard[2*i+1]) + 1
 		ra.keys[i] = key
-		ra.needCopyOnWrite[i] = willNeedCopyOnWrite
 
 		if isRunBitmap != nil && isRunBitmap[i/8]&(1<<(i%8)) != 0 {
 			// run container
@@ -744,18 +674,4 @@ func (ra *roaringArray) advanceUntil(min uint16, pos int) int {
 		}
 	}
 	return upper
-}
-
-func (ra *roaringArray) markAllAsNeedingCopyOnWrite() {
-	for i := range ra.needCopyOnWrite {
-		ra.needCopyOnWrite[i] = true
-	}
-}
-
-func (ra *roaringArray) needsCopyOnWrite(i int) bool {
-	return ra.needCopyOnWrite[i]
-}
-
-func (ra *roaringArray) setNeedsCopyOnWrite(i int) {
-	ra.needCopyOnWrite[i] = true
 }

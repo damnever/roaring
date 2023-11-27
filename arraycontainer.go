@@ -2,7 +2,13 @@ package roaring
 
 import (
 	"fmt"
+
+	"github.com/RoaringBitmap/roaring/internal"
 )
+
+var _arrayContainerPool = internal.NewTypedPool(func() *arrayContainer {
+	return &arrayContainer{}
+})
 
 type arrayContainer struct {
 	content []uint16
@@ -870,9 +876,9 @@ func (ac *arrayContainer) selectInt(x uint16) int {
 }
 
 func (ac *arrayContainer) clone() container {
-	ptr := arrayContainer{make([]uint16, len(ac.content))}
+	ptr := newArrayContainerSize(len(ac.content))
 	copy(ptr.content, ac.content[:])
-	return &ptr
+	return ptr
 }
 
 func (ac *arrayContainer) contains(x uint16) bool {
@@ -880,7 +886,11 @@ func (ac *arrayContainer) contains(x uint16) bool {
 }
 
 func (ac *arrayContainer) loadData(bitmapContainer *bitmapContainer) {
-	ac.content = make([]uint16, bitmapContainer.cardinality, bitmapContainer.cardinality)
+	if cap(ac.content) >= bitmapContainer.cardinality {
+		ac.content = ac.content[:bitmapContainer.cardinality]
+	} else {
+		ac.content = make([]uint16, bitmapContainer.cardinality)
+	}
 	bitmapContainer.fillArray(ac.content)
 }
 
@@ -919,25 +929,43 @@ func (ac *arrayContainer) realloc(size int) {
 }
 
 func newArrayContainer() *arrayContainer {
-	p := new(arrayContainer)
-	return p
+	c := _arrayContainerPool.GetNoCreate()
+	if c == nil {
+		c = &arrayContainer{}
+	}
+	return c
+}
+
+func (ac *arrayContainer) Reset() {
+	ac.content = ac.content[:cap(ac.content)]
+	for i := range ac.content {
+		ac.content[i] = 0
+	}
+	ac.content = ac.content[:0]
 }
 
 func newArrayContainerFromBitmap(bc *bitmapContainer) *arrayContainer {
-	ac := &arrayContainer{}
+	ac := newArrayContainerSize(bc.cardinality)
 	ac.loadData(bc)
 	return ac
 }
 
 func newArrayContainerCapacity(size int) *arrayContainer {
-	p := new(arrayContainer)
-	p.content = make([]uint16, 0, size)
+	p := newArrayContainerSize(size)
+	p.content = p.content[:0]
 	return p
 }
 
 func newArrayContainerSize(size int) *arrayContainer {
-	p := new(arrayContainer)
-	p.content = make([]uint16, size, size)
+	p := _arrayContainerPool.GetNoCreate()
+	if p != nil && cap(p.content) >= size {
+		p.content = p.content[:size]
+	} else {
+		if p != nil {
+			_arrayContainerPool.Put(p) // Put back.
+		}
+		p = &arrayContainer{content: make([]uint16, size, size)}
+	}
 	return p
 }
 

@@ -20,6 +20,10 @@ type Bitmap struct {
 	highlowcontainer roaringArray
 }
 
+func (rb *Bitmap) Reset() {
+	rb.highlowcontainer.Reset()
+}
+
 // ToBase64 serializes a bitmap as Base64
 func (rb *Bitmap) ToBase64() (string, error) {
 	buf := new(bytes.Buffer)
@@ -130,7 +134,7 @@ func (rb *Bitmap) FromUnsafeBytes(data []byte, cookieHeader ...byte) (p int64, e
 func (rb *Bitmap) ReadFrom(reader io.Reader, cookieHeader ...byte) (p int64, err error) {
 	stream, ok := reader.(internal.ByteInput)
 	if !ok {
-		byteInputAdapter := internal.ByteInputAdapterPool.Get().(*internal.ByteInputAdapter)
+		byteInputAdapter := internal.ByteInputAdapterPool.Get()
 		byteInputAdapter.Reset(reader)
 		stream = byteInputAdapter
 	}
@@ -171,7 +175,7 @@ func (rb *Bitmap) ReadFrom(reader io.Reader, cookieHeader ...byte) (p int64, err
 // See also the FromUnsafeBytes function which can have better performance
 // in some cases.
 func (rb *Bitmap) FromBuffer(buf []byte) (p int64, err error) {
-	stream := internal.ByteBufferPool.Get().(*internal.ByteBuffer)
+	stream := internal.ByteBufferPool.Get()
 	stream.Reset(buf)
 
 	p, err = rb.highlowcontainer.readFrom(stream)
@@ -692,7 +696,7 @@ func AddOffset64(x *Bitmap, offset int64) (answer *Bitmap) {
 
 			if key >= 0 && key <= MaxUint16 {
 				c := x.highlowcontainer.getContainerAtIndex(pos).clone()
-				answer.highlowcontainer.appendContainer(uint16(key), c, false)
+				answer.highlowcontainer.appendContainer(uint16(key), c)
 			}
 		}
 	} else {
@@ -720,12 +724,12 @@ func AddOffset64(x *Bitmap, offset int64) (answer *Bitmap) {
 					orresult := prev.ior(lo)
 					answer.highlowcontainer.setContainerAtIndex(curSize-1, orresult)
 				} else {
-					answer.highlowcontainer.appendContainer(uint16(key), lo, false)
+					answer.highlowcontainer.appendContainer(uint16(key), lo)
 				}
 			}
 
 			if hi != nil && key+1 <= MaxUint16 {
-				answer.highlowcontainer.appendContainer(uint16(key+1), hi, false)
+				answer.highlowcontainer.appendContainer(uint16(key+1), hi)
 			}
 		}
 	}
@@ -739,8 +743,7 @@ func (rb *Bitmap) Add(x uint32) {
 	ra := &rb.highlowcontainer
 	i := ra.getIndex(hb)
 	if i >= 0 {
-		var c container
-		c = ra.getWritableContainerAtIndex(i).iaddReturnMinimized(lowbits(x))
+		c := ra.getContainerAtIndex(i).iaddReturnMinimized(lowbits(x))
 		rb.highlowcontainer.setContainerAtIndex(i, c)
 	} else {
 		newac := newArrayContainer()
@@ -755,7 +758,7 @@ func (rb *Bitmap) addwithptr(x uint32) (int, container) {
 	i := ra.getIndex(hb)
 	var c container
 	if i >= 0 {
-		c = ra.getWritableContainerAtIndex(i).iaddReturnMinimized(lowbits(x))
+		c = ra.getContainerAtIndex(i).iaddReturnMinimized(lowbits(x))
 		rb.highlowcontainer.setContainerAtIndex(i, c)
 		return i, c
 	}
@@ -771,7 +774,7 @@ func (rb *Bitmap) CheckedAdd(x uint32) bool {
 	hb := highbits(x)
 	i := rb.highlowcontainer.getIndex(hb)
 	if i >= 0 {
-		C := rb.highlowcontainer.getWritableContainerAtIndex(i)
+		C := rb.highlowcontainer.getContainerAtIndex(i)
 		oldcard := C.getCardinality()
 		C = C.iaddReturnMinimized(lowbits(x))
 		rb.highlowcontainer.setContainerAtIndex(i, C)
@@ -793,7 +796,7 @@ func (rb *Bitmap) Remove(x uint32) {
 	hb := highbits(x)
 	i := rb.highlowcontainer.getIndex(hb)
 	if i >= 0 {
-		c := rb.highlowcontainer.getWritableContainerAtIndex(i).iremoveReturnMinimized(lowbits(x))
+		c := rb.highlowcontainer.getContainerAtIndex(i).iremoveReturnMinimized(lowbits(x))
 		rb.highlowcontainer.setContainerAtIndex(i, c)
 		if rb.highlowcontainer.getContainerAtIndex(i).isEmpty() {
 			rb.highlowcontainer.removeAtIndex(i)
@@ -807,7 +810,7 @@ func (rb *Bitmap) CheckedRemove(x uint32) bool {
 	hb := highbits(x)
 	i := rb.highlowcontainer.getIndex(hb)
 	if i >= 0 {
-		C := rb.highlowcontainer.getWritableContainerAtIndex(i)
+		C := rb.highlowcontainer.getContainerAtIndex(i)
 		oldcard := C.getCardinality()
 		C = C.iremoveReturnMinimized(lowbits(x))
 		rb.highlowcontainer.setContainerAtIndex(i, C)
@@ -888,11 +891,11 @@ main:
 			s2 := x2.highlowcontainer.getKeyAtIndex(pos2)
 			for {
 				if s1 == s2 {
-					c1 := rb.highlowcontainer.getWritableContainerAtIndex(pos1)
+					c1 := rb.highlowcontainer.getContainerAtIndex(pos1)
 					c2 := x2.highlowcontainer.getContainerAtIndex(pos2)
 					diff := c1.iand(c2)
 					if !diff.isEmpty() {
-						rb.highlowcontainer.replaceKeyAndContainerAtIndex(intersectionsize, s1, diff, false)
+						rb.highlowcontainer.replaceKeyAndContainerAtIndex(intersectionsize, s1, diff)
 						intersectionsize++
 					}
 					pos1++
@@ -1107,7 +1110,7 @@ func (rb *Bitmap) Xor(x2 *Bitmap) {
 					break
 				}
 			} else if s1 > s2 {
-				c := x2.highlowcontainer.getWritableContainerAtIndex(pos2)
+				c := x2.highlowcontainer.getContainerAtIndex(pos2)
 				rb.highlowcontainer.insertNewKeyValueAt(pos1, x2.highlowcontainer.getKeyAtIndex(pos2), c)
 				length1++
 				pos1++
@@ -1161,7 +1164,7 @@ main:
 				}
 				s2 = x2.highlowcontainer.getKeyAtIndex(pos2)
 			} else {
-				rb.highlowcontainer.replaceKeyAndContainerAtIndex(pos1, s1, rb.highlowcontainer.getUnionedWritableContainer(pos1, x2.highlowcontainer.getContainerAtIndex(pos2)), false)
+				rb.highlowcontainer.replaceKeyAndContainerAtIndex(pos1, s1, rb.highlowcontainer.getUnionedContainer(pos1, x2.highlowcontainer.getContainerAtIndex(pos2)))
 				pos1++
 				pos2++
 				if (pos1 == length1) || (pos2 == length2) {
@@ -1192,11 +1195,11 @@ main:
 			s2 := x2.highlowcontainer.getKeyAtIndex(pos2)
 			for {
 				if s1 == s2 {
-					c1 := rb.highlowcontainer.getWritableContainerAtIndex(pos1)
+					c1 := rb.highlowcontainer.getContainerAtIndex(pos1)
 					c2 := x2.highlowcontainer.getContainerAtIndex(pos2)
 					diff := c1.iandNot(c2)
 					if !diff.isEmpty() {
-						rb.highlowcontainer.replaceKeyAndContainerAtIndex(intersectionsize, s1, diff, false)
+						rb.highlowcontainer.replaceKeyAndContainerAtIndex(intersectionsize, s1, diff)
 						intersectionsize++
 					}
 					pos1++
@@ -1208,8 +1211,7 @@ main:
 					s2 = x2.highlowcontainer.getKeyAtIndex(pos2)
 				} else if s1 < s2 {
 					c1 := rb.highlowcontainer.getContainerAtIndex(pos1)
-					mustCopyOnWrite := rb.highlowcontainer.needsCopyOnWrite(pos1)
-					rb.highlowcontainer.replaceKeyAndContainerAtIndex(intersectionsize, s1, c1, mustCopyOnWrite)
+					rb.highlowcontainer.replaceKeyAndContainerAtIndex(intersectionsize, s1, c1)
 					intersectionsize++
 					pos1++
 					if pos1 == length1 {
@@ -1232,8 +1234,7 @@ main:
 	for pos1 < length1 {
 		c1 := rb.highlowcontainer.getContainerAtIndex(pos1)
 		s1 := rb.highlowcontainer.getKeyAtIndex(pos1)
-		mustCopyOnWrite := rb.highlowcontainer.needsCopyOnWrite(pos1)
-		rb.highlowcontainer.replaceKeyAndContainerAtIndex(intersectionsize, s1, c1, mustCopyOnWrite)
+		rb.highlowcontainer.replaceKeyAndContainerAtIndex(intersectionsize, s1, c1)
 		intersectionsize++
 		pos1++
 	}
@@ -1268,8 +1269,7 @@ main:
 				}
 				s2 = x2.highlowcontainer.getKeyAtIndex(pos2)
 			} else {
-
-				answer.highlowcontainer.appendContainer(s1, x1.highlowcontainer.getContainerAtIndex(pos1).or(x2.highlowcontainer.getContainerAtIndex(pos2)), false)
+				answer.highlowcontainer.appendContainer(s1, x1.highlowcontainer.getContainerAtIndex(pos1).or(x2.highlowcontainer.getContainerAtIndex(pos2)))
 				pos1++
 				pos2++
 				if (pos1 == length1) || (pos2 == length2) {
@@ -1305,7 +1305,7 @@ main:
 				C = C.and(x2.highlowcontainer.getContainerAtIndex(pos2))
 
 				if !C.isEmpty() {
-					answer.highlowcontainer.appendContainer(s1, C, false)
+					answer.highlowcontainer.appendContainer(s1, C)
 				}
 				pos1++
 				pos2++
@@ -1352,7 +1352,7 @@ func Xor(x1, x2 *Bitmap) *Bitmap {
 			} else {
 				c := x1.highlowcontainer.getContainerAtIndex(pos1).xor(x2.highlowcontainer.getContainerAtIndex(pos2))
 				if !c.isEmpty() {
-					answer.highlowcontainer.appendContainer(s1, c, false)
+					answer.highlowcontainer.appendContainer(s1, c)
 				}
 				pos1++
 				pos2++
@@ -1395,7 +1395,7 @@ main:
 					c2 := x2.highlowcontainer.getContainerAtIndex(pos2)
 					diff := c1.andNot(c2)
 					if !diff.isEmpty() {
-						answer.highlowcontainer.appendContainer(s1, diff, false)
+						answer.highlowcontainer.appendContainer(s1, diff)
 					}
 					pos1++
 					pos2++
@@ -1483,7 +1483,7 @@ func (rb *Bitmap) Flip(rangeStart, rangeEnd uint64) {
 		i := rb.highlowcontainer.getIndex(uint16(hb))
 
 		if i >= 0 {
-			c := rb.highlowcontainer.getWritableContainerAtIndex(i).inot(int(containerStart), int(containerLast)+1)
+			c := rb.highlowcontainer.getContainerAtIndex(i).inot(int(containerStart), int(containerLast)+1)
 			if !c.isEmpty() {
 				rb.highlowcontainer.setContainerAtIndex(i, c)
 			} else {
@@ -1530,7 +1530,7 @@ func (rb *Bitmap) AddRange(rangeStart, rangeEnd uint64) {
 		i := rb.highlowcontainer.getIndex(uint16(hb))
 
 		if i >= 0 {
-			c := rb.highlowcontainer.getWritableContainerAtIndex(i).iaddRange(int(containerStart), int(containerLast)+1)
+			c := rb.highlowcontainer.getContainerAtIndex(i).iaddRange(int(containerStart), int(containerLast)+1)
 			rb.highlowcontainer.setContainerAtIndex(i, c)
 		} else { // *think* the range of ones must never be
 			// empty.
@@ -1564,7 +1564,7 @@ func (rb *Bitmap) RemoveRange(rangeStart, rangeEnd uint64) {
 		if i < 0 {
 			return
 		}
-		c := rb.highlowcontainer.getWritableContainerAtIndex(i).iremoveRange(int(lbStart), int(lbLast+1))
+		c := rb.highlowcontainer.getContainerAtIndex(i).iremoveRange(int(lbStart), int(lbLast+1))
 		if !c.isEmpty() {
 			rb.highlowcontainer.setContainerAtIndex(i, c)
 		} else {
@@ -1577,7 +1577,7 @@ func (rb *Bitmap) RemoveRange(rangeStart, rangeEnd uint64) {
 
 	if ifirst >= 0 {
 		if lbStart != 0 {
-			c := rb.highlowcontainer.getWritableContainerAtIndex(ifirst).iremoveRange(int(lbStart), int(max+1))
+			c := rb.highlowcontainer.getContainerAtIndex(ifirst).iremoveRange(int(lbStart), int(max+1))
 			if !c.isEmpty() {
 				rb.highlowcontainer.setContainerAtIndex(ifirst, c)
 				ifirst++
@@ -1588,7 +1588,7 @@ func (rb *Bitmap) RemoveRange(rangeStart, rangeEnd uint64) {
 	}
 	if ilast >= 0 {
 		if lbLast != max {
-			c := rb.highlowcontainer.getWritableContainerAtIndex(ilast).iremoveRange(int(0), int(lbLast+1))
+			c := rb.highlowcontainer.getContainerAtIndex(ilast).iremoveRange(int(0), int(lbLast+1))
 			if !c.isEmpty() {
 				rb.highlowcontainer.setContainerAtIndex(ilast, c)
 			} else {
@@ -1661,34 +1661,6 @@ func Flip(bm *Bitmap, rangeStart, rangeEnd uint64) *Bitmap {
 	return answer
 }
 
-// SetCopyOnWrite sets this bitmap to use copy-on-write so that copies are fast and memory conscious
-// if the parameter is true, otherwise we leave the default where hard copies are made
-// (copy-on-write requires extra care in a threaded context).
-// Calling SetCopyOnWrite(true) on a bitmap created with FromBuffer is unsafe.
-func (rb *Bitmap) SetCopyOnWrite(val bool) {
-	rb.highlowcontainer.copyOnWrite = val
-}
-
-// GetCopyOnWrite gets this bitmap's copy-on-write property
-func (rb *Bitmap) GetCopyOnWrite() (val bool) {
-	return rb.highlowcontainer.copyOnWrite
-}
-
-// CloneCopyOnWriteContainers clones all containers which have
-// needCopyOnWrite set to true.
-// This can be used to make sure it is safe to munmap a []byte
-// that the roaring array may still have a reference to, after
-// calling FromBuffer.
-// More generally this function is useful if you call FromBuffer
-// to construct a bitmap with a backing array buf
-// and then later discard the buf array. Note that you should call
-// CloneCopyOnWriteContainers on all bitmaps that were derived
-// from the 'FromBuffer' bitmap since they map have dependencies
-// on the buf array as well.
-func (rb *Bitmap) CloneCopyOnWriteContainers() {
-	rb.highlowcontainer.cloneCopyOnWriteContainers()
-}
-
 // FlipInt calls Flip after casting the parameters (convenience method)
 func FlipInt(bm *Bitmap, rangeStart, rangeEnd int) *Bitmap {
 	return Flip(bm, uint64(rangeStart), uint64(rangeEnd))
@@ -1735,4 +1707,8 @@ func (rb *Bitmap) Stats() Statistics {
 		}
 	}
 	return stats
+}
+
+func (rb *Bitmap) Unsafe() bool {
+	return rb.highlowcontainer.Unsafe()
 }

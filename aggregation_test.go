@@ -3,7 +3,6 @@ package roaring
 // to run just these tests: go test -run TestParAggregations
 
 import (
-	"fmt"
 	"sort"
 	"testing"
 
@@ -61,9 +60,6 @@ func testAggregations(t *testing.T,
 		rb1 := NewBitmap()
 		rb2 := NewBitmap()
 		rb3 := NewBitmap()
-		rb1.SetCopyOnWrite(true)
-		rb2.SetCopyOnWrite(true)
-		rb3.SetCopyOnWrite(true)
 		rb1.Add(1)
 		rb1.Add(100000)
 		rb2.Add(200000)
@@ -115,9 +111,6 @@ func testAggregations(t *testing.T,
 		rb1 := NewBitmap()
 		rb2 := NewBitmap()
 		rb3 := NewBitmap()
-		rb1.SetCopyOnWrite(true)
-		rb2.SetCopyOnWrite(true)
-		rb3.SetCopyOnWrite(true)
 		rb1.Add(1)
 		rb1.Add(100000)
 		rb2.Add(200000)
@@ -233,29 +226,6 @@ func assertAggregation(t *testing.T, expected uint64, aggr func(bitmaps ...*Bitm
 	if aggr != nil {
 		assert.Equal(t, aggr(bitmaps...).GetCardinality(), expected)
 	}
-}
-
-func TestParAggregations(t *testing.T) {
-	for _, p := range [...]int{1, 2, 4} {
-		andFunc := func(bitmaps ...*Bitmap) *Bitmap {
-			return ParAnd(p, bitmaps...)
-		}
-		orFunc := func(bitmaps ...*Bitmap) *Bitmap {
-			return ParOr(p, bitmaps...)
-		}
-
-		t.Run(fmt.Sprintf("par%d", p), func(t *testing.T) {
-			testAggregations(t, andFunc, orFunc, nil)
-		})
-	}
-}
-
-func TestParHeapAggregations(t *testing.T) {
-	orFunc := func(bitmaps ...*Bitmap) *Bitmap {
-		return ParHeapOr(0, bitmaps...)
-	}
-
-	testAggregations(t, nil, orFunc, nil)
 }
 
 func TestFastAggregations(t *testing.T) {

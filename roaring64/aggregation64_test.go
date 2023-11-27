@@ -4,8 +4,9 @@ package roaring64
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func testAggregations(t *testing.T,
@@ -59,9 +60,6 @@ func testAggregations(t *testing.T,
 		rb1 := NewBitmap()
 		rb2 := NewBitmap()
 		rb3 := NewBitmap()
-		rb1.SetCopyOnWrite(true)
-		rb2.SetCopyOnWrite(true)
-		rb3.SetCopyOnWrite(true)
 		rb1.Add(uint64(1))
 		rb1.Add(uint64(100000))
 		rb2.Add(uint64(200000))
@@ -107,9 +105,6 @@ func testAggregations(t *testing.T,
 		rb1 := NewBitmap()
 		rb2 := NewBitmap()
 		rb3 := NewBitmap()
-		rb1.SetCopyOnWrite(true)
-		rb2.SetCopyOnWrite(true)
-		rb3.SetCopyOnWrite(true)
 		rb1.Add(uint64(1))
 		rb1.Add(uint64(100000))
 		rb2.Add(uint64(200000))

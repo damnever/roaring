@@ -10,9 +10,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/RoaringBitmap/roaring"
 	"github.com/bits-and-blooms/bitset"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/RoaringBitmap/roaring"
 )
 
 func TestRoaringIntervalCheck(t *testing.T) {
@@ -31,7 +32,7 @@ func TestRoaringIntervalCheck(t *testing.T) {
 func TestIssue316(t *testing.T) {
 	a := BitmapOf(5, 18446744073709551613, 18446744073709551614, 18446744073709551615)
 	b := BitmapOf(0, 1, 2, 3, 4)
-	c := ParOr(0, a, b)
+	c := Or(a, b)
 	expected := BitmapOf(0, 1, 2, 3, 4, 5, 18446744073709551613, 18446744073709551614, 18446744073709551615)
 	assert.True(t, c.Equals(expected))
 }
@@ -1936,7 +1937,6 @@ func TestClear64(t *testing.T) {
 
 func TestRunCompression(t *testing.T) {
 	bmp := New()
-	bmp.SetCopyOnWrite(true)
 	for i := 100; i < 10000; i++ {
 		bmp.Add(uint64(i))
 	}
@@ -1948,12 +1948,10 @@ func TestRunCompression(t *testing.T) {
 	bmp.RunOptimize()
 	assert.True(t, bmp.HasRunCompression())
 	assert.True(t, sizeOrigin > bmp.GetSizeInBytes())
-	assert.True(t, bmp.GetCopyOnWrite())
 }
 
 func Test64BitValues(t *testing.T) {
 	bmp := New()
-	bmp.SetCopyOnWrite(true)
 	for i := 100; i < 1000; i++ {
 		bmp.Add(uint64(i))
 	}

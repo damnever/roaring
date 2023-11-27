@@ -3,6 +3,18 @@ package roaring
 import (
 	"fmt"
 	"unsafe"
+
+	"github.com/RoaringBitmap/roaring/internal"
+)
+
+const bitmapContainerSize = (1 << 16) / 64
+
+var (
+	_bitmapContainerPool = internal.NewTypedPool(func() *bitmapContainer {
+		return &bitmapContainer{
+			bitmap: make([]uint64, bitmapContainerSize),
+		}
+	})
 )
 
 type bitmapContainer struct {
@@ -19,10 +31,7 @@ func (bc bitmapContainer) String() string {
 }
 
 func newBitmapContainer() *bitmapContainer {
-	p := new(bitmapContainer)
-	size := (1 << 16) / 64
-	p.bitmap = make([]uint64, size, size)
-	return p
+	return _bitmapContainerPool.Get()
 }
 
 func newBitmapContainerwithRange(firstOfRun, lastOfRun int) *bitmapContainer {
@@ -43,6 +52,13 @@ func newBitmapContainerwithRange(firstOfRun, lastOfRun int) *bitmapContainer {
 		bc.bitmap[lastWord] ^= maskOnLeft
 	}
 	return bc
+}
+
+func (bc *bitmapContainer) Reset() {
+	for i := range bc.bitmap {
+		bc.bitmap[i] = 0
+	}
+	bc.cardinality = 0
 }
 
 func (bc *bitmapContainer) minimum() uint16 {
@@ -355,9 +371,10 @@ func (bc *bitmapContainer) isEmpty() bool {
 }
 
 func (bc *bitmapContainer) clone() container {
-	ptr := bitmapContainer{bc.cardinality, make([]uint64, len(bc.bitmap))}
+	ptr := newBitmapContainer()
+	ptr.cardinality = bc.cardinality
 	copy(ptr.bitmap, bc.bitmap[:])
-	return &ptr
+	return ptr
 }
 
 // add all values in range [firstOfRange,lastOfRange)

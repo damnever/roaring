@@ -544,10 +544,6 @@ func TestBitmap_FromBuffer(t *testing.T) {
 		_, err = rb.FromBuffer(buf)
 
 		require.NoError(t, err)
-
-		for i, cow := range rb.highlowcontainer.needCopyOnWrite {
-			assert.Truef(t, cow, "Container at pos %d was not marked as needs-copy-on-write", i)
-		}
 	})
 }
 
@@ -619,9 +615,6 @@ func TestBitmapFromBufferCOW(t *testing.T) {
 	rbor1 := Or(newRb1, newRb2)
 	rbor2 := rbor1
 	rbor3 := Or(newRb1, newRb2)
-	rbor1.CloneCopyOnWriteContainers()
-	rbor2.CloneCopyOnWriteContainers()
-	rbor3.CloneCopyOnWriteContainers()
 	buf1.Reset()
 	buf2.Reset()
 	rbbogus.WriteTo(buf1)

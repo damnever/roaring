@@ -42,7 +42,11 @@ import (
 	"fmt"
 	"sort"
 	"unsafe"
+
+	"github.com/RoaringBitmap/roaring/internal"
 )
+
+var _runContainer16Pool = internal.NewTypedPool(func() *runContainer16 { return &runContainer16{} })
 
 // runContainer16 does run-length encoding of sets of
 // uint16 integers.
@@ -151,7 +155,7 @@ func (ah *addHelper16) add(cur, prev uint16, i int) {
 
 // newRunContainerRange makes a new container made of just the specified closed interval [rangestart,rangelast]
 func newRunContainer16Range(rangestart uint16, rangelast uint16) *runContainer16 {
-	rc := &runContainer16{}
+	rc := newRunContainer16()
 	rc.iv = append(rc.iv, newInterval16Range(rangestart, rangelast))
 	return rc
 }
@@ -168,7 +172,7 @@ func newRunContainer16Range(rangestart uint16, rangelast uint16) *runContainer16
 func newRunContainer16FromVals(alreadySorted bool, vals ...uint16) *runContainer16 {
 	// keep this in sync with newRunContainer16FromArray below
 
-	rc := &runContainer16{}
+	rc := newRunContainer16()
 	ah := addHelper16{rc: rc}
 
 	if !alreadySorted {
@@ -201,12 +205,19 @@ func newRunContainer16FromVals(alreadySorted bool, vals ...uint16) *runContainer
 // https://github.com/RoaringBitmap/RoaringBitmap/blob/master/src/main/java/org/roaringbitmap/RunContainer.java#L145-L192
 func newRunContainer16FromBitmapContainer(bc *bitmapContainer) *runContainer16 {
 
-	rc := &runContainer16{}
+	rc := newRunContainer16()
 	nbrRuns := bc.numberOfRuns()
 	if nbrRuns == 0 {
 		return rc
 	}
-	rc.iv = make([]interval16, nbrRuns)
+	if cap(rc.iv) >= nbrRuns {
+		rc.iv = rc.iv[:nbrRuns]
+	} else {
+		_runContainer16Pool.Put(rc)
+		rc = &runContainer16{
+			iv: make([]interval16, nbrRuns),
+		}
+	}
 
 	longCtr := 0            // index of current long in bitmap
 	curWord := bc.bitmap[0] // its value
@@ -258,7 +269,7 @@ func newRunContainer16FromBitmapContainer(bc *bitmapContainer) *runContainer16 {
 func newRunContainer16FromArray(arr *arrayContainer) *runContainer16 {
 	// keep this in sync with newRunContainer16FromVals above
 
-	rc := &runContainer16{}
+	rc := newRunContainer16()
 	ah := addHelper16{rc: rc}
 
 	n := arr.getCardinality()
@@ -985,17 +996,34 @@ func (rc *runContainer16) AsSlice() []uint16 {
 
 // newRunContainer16 creates an empty run container.
 func newRunContainer16() *runContainer16 {
-	return &runContainer16{}
+	return _runContainer16Pool.Get()
 }
 
 // newRunContainer16CopyIv creates a run container, initializing
 // with a copy of the supplied iv slice.
 func newRunContainer16CopyIv(iv []interval16) *runContainer16 {
-	rc := &runContainer16{
-		iv: make([]interval16, len(iv)),
+	rc := _runContainer16Pool.GetNoCreate()
+	if rc != nil && cap(rc.iv) >= len(iv) {
+		rc.iv = rc.iv[:len(iv)]
+	} else {
+		if rc != nil {
+			_runContainer16Pool.Put(rc)
+		}
+		rc = &runContainer16{
+			iv: make([]interval16, len(iv)),
+		}
 	}
 	copy(rc.iv, iv)
 	return rc
+}
+
+func (rc *runContainer16) Reset() {
+	rc.iv = rc.iv[:cap(rc.iv)]
+	for i := range rc.iv {
+		rc.iv[i].start = 0
+		rc.iv[i].length = 0
+	}
+	rc.iv = rc.iv[:0]
 }
 
 func (rc *runContainer16) Clone() *runContainer16 {

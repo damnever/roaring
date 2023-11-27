@@ -33,7 +33,7 @@ main:
 				s2 = x2.highlowcontainer.getKeyAtIndex(pos2)
 			} else {
 				c1 := x1.highlowcontainer.getContainerAtIndex(pos1)
-				answer.highlowcontainer.appendContainer(s1, c1.lazyOR(x2.highlowcontainer.getContainerAtIndex(pos2)), false)
+				answer.highlowcontainer.appendContainer(s1, c1.lazyOR(x2.highlowcontainer.getContainerAtIndex(pos2)))
 				pos1++
 				pos2++
 				if (pos1 == length1) || (pos2 == length2) {
@@ -80,9 +80,8 @@ main:
 				}
 				s2 = x2.highlowcontainer.getKeyAtIndex(pos2)
 			} else {
-				c1 := x1.highlowcontainer.getWritableContainerAtIndex(pos1)
+				c1 := x1.highlowcontainer.getContainerAtIndex(pos1)
 				x1.highlowcontainer.containers[pos1] = c1.lazyIOR(x2.highlowcontainer.getContainerAtIndex(pos2))
-				x1.highlowcontainer.needCopyOnWrite[pos1] = false
 				pos1++
 				pos2++
 				if (pos1 == length1) || (pos2 == length2) {
@@ -106,7 +105,7 @@ func (x1 *Bitmap) repairAfterLazy() {
 		switch c.(type) {
 		case *bitmapContainer:
 			if c.(*bitmapContainer).cardinality == invalidCardinality {
-				c = x1.highlowcontainer.getWritableContainerAtIndex(pos)
+				c = x1.highlowcontainer.getContainerAtIndex(pos)
 				c.(*bitmapContainer).computeCardinality()
 				if c.(*bitmapContainer).getCardinality() <= arrayDefaultMaxSize {
 					x1.highlowcontainer.setContainerAtIndex(pos, c.(*bitmapContainer).toArrayContainer())
@@ -299,9 +298,9 @@ func (x1 *Bitmap) AndAny(bitmaps ...*Bitmap) {
 			}
 		}
 
-		result := x1.highlowcontainer.getWritableContainerAtIndex(basePos).iand(ored)
+		result := x1.highlowcontainer.getContainerAtIndex(basePos).iand(ored)
 		if !result.isEmpty() {
-			x1.highlowcontainer.replaceKeyAndContainerAtIndex(intersections, baseKey, result, false)
+			x1.highlowcontainer.replaceKeyAndContainerAtIndex(intersections, baseKey, result)
 			intersections++
 		}
 

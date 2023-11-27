@@ -1954,7 +1954,7 @@ func TestRoaringArray(t *testing.T) {
 	})
 
 	t.Run("Test Insert", func(t *testing.T) {
-		a.appendContainer(0, newArrayContainer(), false)
+		a.appendContainer(0, newArrayContainer())
 		assert.Equal(t, 1, a.size())
 	})
 

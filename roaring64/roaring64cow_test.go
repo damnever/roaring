@@ -16,7 +16,6 @@ func TestIssue386(t *testing.T) {
 	for i := uint64(0); i < 1000; i++ {
 		a.Add(i)
 	}
-	a.SetCopyOnWrite(true)
 	aClone := a.Clone()
 	assert.False(t, a.Contains(1001))
 	assert.EqualValues(t, 1000, a.GetCardinality())
@@ -42,7 +41,6 @@ func TestIssue386(t *testing.T) {
 
 func TestCloneOfCOW(t *testing.T) {
 	rb1 := NewBitmap()
-	rb1.SetCopyOnWrite(true)
 	rb1.Add(uint64(10))
 	rb1.Add(uint64(12))
 	rb1.Remove(uint64(12))
@@ -66,7 +64,6 @@ func TestCloneOfCOW(t *testing.T) {
 
 func TestCloneOfCOWRange(t *testing.T) {
 	rb1 := NewBitmap()
-	rb1.SetCopyOnWrite(true)
 	rb1.Add(uint64(10))
 	rb1.Add(uint64(12))
 	rb1.Remove(uint64(12))
@@ -89,7 +86,6 @@ func TestCloneOfCOWRange(t *testing.T) {
 func TestRoaringBitmapBitmapOfCOW(t *testing.T) {
 	array := []uint64{5580, 33722, 44031, 57276, 83097, 234294967296, 195839473298, 14000000000000000100}
 	bmp := BitmapOf(array...)
-	bmp.SetCopyOnWrite(true)
 
 	assert.EqualValues(t, len(array), bmp.GetCardinality())
 }
@@ -97,7 +93,6 @@ func TestRoaringBitmapBitmapOfCOW(t *testing.T) {
 func TestRoaringBitmapAddCOW(t *testing.T) {
 	array := []uint64{5580, 33722, 44031, 57276, 83097, 234294967296, 195839473298, 14000000000000000100}
 	bmp := New()
-	bmp.SetCopyOnWrite(true)
 	for _, v := range array {
 		bmp.Add(v)
 	}
@@ -108,7 +103,6 @@ func TestRoaringBitmapAddCOW(t *testing.T) {
 func TestRoaringBitmapAddManyCOW(t *testing.T) {
 	array := []uint64{5580, 33722, 44031, 57276, 83097}
 	bmp := NewBitmap()
-	bmp.SetCopyOnWrite(true)
 
 	bmp.AddMany(array)
 
@@ -118,7 +112,6 @@ func TestRoaringBitmapAddManyCOW(t *testing.T) {
 // https://github.com/RoaringBitmap/roaring/issues/64
 func TestFlip64COW(t *testing.T) {
 	bm := New()
-	bm.SetCopyOnWrite(true)
 
 	bm.AddInt(0)
 	bm.Flip(uint64(1), uint64(2))
@@ -130,7 +123,6 @@ func TestFlip64COW(t *testing.T) {
 // https://github.com/RoaringBitmap/roaring/issues/64
 func TestFlip64OffCOW(t *testing.T) {
 	bm := New()
-	bm.SetCopyOnWrite(true)
 
 	bm.AddInt(10)
 	bm.Flip(uint64(11), uint64(12))
@@ -141,7 +133,6 @@ func TestFlip64OffCOW(t *testing.T) {
 
 func TestStringerCOW(t *testing.T) {
 	v := NewBitmap()
-	v.SetCopyOnWrite(true)
 	for i := uint64(0); i < 10; i++ {
 		v.Add(i)
 	}
@@ -155,12 +146,10 @@ func TestStringerCOW(t *testing.T) {
 
 func TestFastCardCOW(t *testing.T) {
 	bm := NewBitmap()
-	bm.SetCopyOnWrite(true)
 	bm.Add(uint64(1))
 	bm.AddRange(uint64(21), uint64(260000))
 
 	bm2 := NewBitmap()
-	bm2.SetCopyOnWrite(true)
 	bm2.Add(uint64(25))
 
 	assert.EqualValues(t, 1, bm2.AndCardinality(bm))
@@ -182,12 +171,10 @@ func TestFastCardCOW(t *testing.T) {
 
 func TestIntersects1COW(t *testing.T) {
 	bm := NewBitmap()
-	bm.SetCopyOnWrite(true)
 	bm.Add(uint64(1))
 	bm.AddRange(uint64(21), uint64(26))
 
 	bm2 := NewBitmap()
-	bm2.SetCopyOnWrite(true)
 	bm2.Add(uint64(25))
 
 	assert.True(t, bm2.Intersects(bm))
@@ -201,7 +188,6 @@ func TestIntersects1COW(t *testing.T) {
 
 func TestRangePanicCOW(t *testing.T) {
 	bm := NewBitmap()
-	bm.SetCopyOnWrite(true)
 	bm.Add(uint64(1))
 	bm.AddRange(uint64(21), uint64(26))
 	bm.AddRange(uint64(9), uint64(14))
@@ -210,7 +196,6 @@ func TestRangePanicCOW(t *testing.T) {
 
 func TestRangeRemovalCOW(t *testing.T) {
 	bm := NewBitmap()
-	bm.SetCopyOnWrite(true)
 	bm.Add(uint64(1))
 	bm.AddRange(uint64(21), uint64(26))
 	bm.AddRange(uint64(9), uint64(14))
@@ -228,7 +213,6 @@ func TestRangeRemovalCOW(t *testing.T) {
 
 func TestRangeRemovalFromContentCOW(t *testing.T) {
 	bm := NewBitmap()
-	bm.SetCopyOnWrite(true)
 	for i := 100; i < 10000; i++ {
 		bm.AddInt(i * 3)
 	}
@@ -243,7 +227,6 @@ func TestRangeRemovalFromContentCOW(t *testing.T) {
 func TestFlipOnEmptyCOW(t *testing.T) {
 	t.Run("TestFlipOnEmpty in-place", func(t *testing.T) {
 		bm := NewBitmap()
-		bm.SetCopyOnWrite(true)
 		bm.Flip(uint64(0), uint64(10))
 		c := bm.GetCardinality()
 
@@ -252,7 +235,6 @@ func TestFlipOnEmptyCOW(t *testing.T) {
 
 	t.Run("TestFlipOnEmpty, generating new result", func(t *testing.T) {
 		bm := NewBitmap()
-		bm.SetCopyOnWrite(true)
 		bm = Flip(bm, 0, 10)
 		c := bm.GetCardinality()
 
@@ -265,7 +247,6 @@ func TestBitmapRankCOW(t *testing.T) {
 		t.Run("rank tests"+strconv.Itoa(int(N)), func(t *testing.T) {
 			for gap := uint64(1); gap <= 65536; gap *= 2 {
 				rb1 := NewBitmap()
-				rb1.SetCopyOnWrite(true)
 				for x := uint64(0); x <= N; x += gap {
 					rb1.Add(x)
 				}
@@ -284,7 +265,6 @@ func TestBitmapSelectCOW(t *testing.T) {
 		t.Run("rank tests"+strconv.Itoa(int(N)), func(t *testing.T) {
 			for gap := uint64(1); gap <= 65536; gap *= 2 {
 				rb1 := NewBitmap()
-				rb1.SetCopyOnWrite(true)
 				for x := uint64(0); x <= N; x += gap {
 					rb1.Add(x)
 				}
@@ -311,7 +291,6 @@ func TestBitmapExtraCOW(t *testing.T) {
 			for gap := uint64(1); gap <= 65536; gap *= 2 {
 				bs1 := bitset.New(0)
 				rb1 := NewBitmap()
-				rb1.SetCopyOnWrite(true)
 
 				for x := uint64(0); x <= N; x += gap {
 					bs1.Set(uint(x))
@@ -324,7 +303,6 @@ func TestBitmapExtraCOW(t *testing.T) {
 				for offset := uint64(1); offset <= gap; offset *= 2 {
 					bs2 := bitset.New(0)
 					rb2 := NewBitmap()
-					rb2.SetCopyOnWrite(true)
 
 					for x := uint64(0); x <= N; x += gap {
 						bs2.Set(uint(x + offset))
@@ -369,7 +347,6 @@ func TestBitmapExtraCOW(t *testing.T) {
 func TestBitmapCOW(t *testing.T) {
 	t.Run("Test Contains", func(t *testing.T) {
 		rbm1 := NewBitmap()
-		rbm1.SetCopyOnWrite(true)
 		for k := 0; k < 1000; k++ {
 			rbm1.AddInt(17 * k)
 		}
@@ -380,7 +357,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("Test Clone", func(t *testing.T) {
 		rb1 := NewBitmap()
-		rb1.SetCopyOnWrite(true)
 		rb1.Add(uint64(10))
 
 		rb2 := rb1.Clone()
@@ -391,9 +367,7 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("Test ANDNOT4", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb2 := NewBitmap()
-		rb2.SetCopyOnWrite(true)
 
 		for i := 0; i < 200000; i += 4 {
 			rb2.AddInt(i)
@@ -414,14 +388,12 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("Test AND", func(t *testing.T) {
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		for k := 0; k < 4000; k++ {
 			rr.AddInt(k)
 		}
 		rr.Add(uint64(100000))
 		rr.Add(uint64(110000))
 		rr2 := NewBitmap()
-		rr2.SetCopyOnWrite(true)
 		rr2.Add(uint64(13))
 		rrand := And(rr, rr2)
 		array := rrand.ToArray()
@@ -438,7 +410,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("Test AND 2", func(t *testing.T) {
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		for k := 4000; k < 4256; k++ {
 			rr.AddInt(k)
 		}
@@ -462,7 +433,6 @@ func TestBitmapCOW(t *testing.T) {
 		}
 
 		rr2 := NewBitmap()
-		rr2.SetCopyOnWrite(true)
 		for k := 4000; k < 4256; k++ {
 			rr2.AddInt(k)
 		}
@@ -489,14 +459,12 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("Test AND 2", func(t *testing.T) {
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		for k := 0; k < 4000; k++ {
 			rr.AddInt(k)
 		}
 		rr.AddInt(100000)
 		rr.AddInt(110000)
 		rr2 := NewBitmap()
-		rr2.SetCopyOnWrite(true)
 		rr2.AddInt(13)
 
 		rrand := And(rr, rr2)
@@ -508,9 +476,7 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("Test AND 3a", func(t *testing.T) {
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		rr2 := NewBitmap()
-		rr2.SetCopyOnWrite(true)
 		for k := 6 * 65536; k < 6*65536+10000; k++ {
 			rr.AddInt(k)
 		}
@@ -527,7 +493,6 @@ func TestBitmapCOW(t *testing.T) {
 		//393,216
 		pos := 0
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		for k := 4000; k < 4256; k++ {
 			rr.AddInt(k)
 		}
@@ -554,7 +519,6 @@ func TestBitmapCOW(t *testing.T) {
 		}
 
 		rr2 := NewBitmap()
-		rr2.SetCopyOnWrite(true)
 		for k := 4000; k < 4256; k++ {
 			rr2.AddInt(k)
 			arrayand[pos] = uint64(k)
@@ -607,9 +571,7 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("Test AND 4", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb2 := NewBitmap()
-		rb2.SetCopyOnWrite(true)
 
 		for i := 0; i < 200000; i += 4 {
 			rb2.AddInt(i)
@@ -652,12 +614,10 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("or test", func(t *testing.T) {
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		for k := 0; k < 4000; k++ {
 			rr.AddInt(k)
 		}
 		rr2 := NewBitmap()
-		rr2.SetCopyOnWrite(true)
 		for k := 4000; k < 8000; k++ {
 			rr2.AddInt(k)
 		}
@@ -667,7 +627,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("basic test", func(t *testing.T) {
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		var a [4002]uint64
 		pos := 0
 		for k := 0; k < 4000; k++ {
@@ -699,7 +658,6 @@ func TestBitmapCOW(t *testing.T) {
 		for gap := 7; gap < 100000; gap *= 10 {
 			for offset := 2; offset <= 1024; offset *= 2 {
 				rb := NewBitmap()
-				rb.SetCopyOnWrite(true)
 				for k := 0; k < N; k++ {
 					rb.AddInt(k * gap)
 					assert.EqualValues(t, k+1, rb.GetCardinality())
@@ -714,7 +672,6 @@ func TestBitmapCOW(t *testing.T) {
 				}
 
 				rb2 := NewBitmap()
-				rb2.SetCopyOnWrite(true)
 
 				for k := 0; k < N; k++ {
 					rb2.AddInt(k * gap * offset)
@@ -736,7 +693,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("clear test", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		for i := 0; i < 200000; i += 7 {
 			// dense
 			rb.AddInt(i)
@@ -747,9 +703,7 @@ func TestBitmapCOW(t *testing.T) {
 		}
 
 		rb2 := NewBitmap()
-		rb2.SetCopyOnWrite(true)
 		rb3 := NewBitmap()
-		rb3.SetCopyOnWrite(true)
 		for i := 0; i < 200000; i += 4 {
 			rb2.AddInt(i)
 		}
@@ -794,7 +748,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("flipTest1 ", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.Flip(uint64(100000), uint64(200000)) // in-place on empty bitmap
 		rbcard := rb.GetCardinality()
 
@@ -810,7 +763,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("flipTest1A", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb1 := Flip(rb, 100000, 200000)
 		rbcard := rb1.GetCardinality()
 
@@ -829,7 +781,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("flipTest2", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.Flip(uint64(100000), uint64(100000))
 		rbcard := rb.GetCardinality()
 
@@ -841,7 +792,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("flipTest2A", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb1 := Flip(rb, 100000, 100000)
 
 		rb.AddInt(1)
@@ -859,7 +809,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("flipTest3A", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.Flip(uint64(100000), uint64(200000)) // got 100k-199999
 		rb.Flip(uint64(100000), uint64(199991)) // give back 100k-199990
 		rbcard := rb.GetCardinality()
@@ -877,7 +826,6 @@ func TestBitmapCOW(t *testing.T) {
 	t.Run("flipTest4A", func(t *testing.T) {
 		// fits evenly on both ends
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.Flip(uint64(100000), uint64(200000)) // got 100k-199999
 		rb.Flip(uint64(65536), uint64(4*65536))
 		rbcard := rb.GetCardinality()
@@ -902,7 +850,6 @@ func TestBitmapCOW(t *testing.T) {
 		// fits evenly on small end, multiple
 		// containers
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.Flip(uint64(100000), uint64(132000))
 		rb.Flip(uint64(65536), uint64(120000))
 		rbcard := rb.GetCardinality()
@@ -925,7 +872,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("flipTest6", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb1 := Flip(rb, 100000, 132000)
 		rb2 := Flip(rb1, 65536, 120000)
 		//rbcard := rb2.GetCardinality()
@@ -943,7 +889,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("flipTest6A", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb1 := Flip(rb, 100000, 132000)
 		rb2 := Flip(rb1, 99000, 2*65536)
 		rbcard := rb2.GetCardinality()
@@ -964,7 +909,6 @@ func TestBitmapCOW(t *testing.T) {
 	t.Run("flipTest7", func(t *testing.T) {
 		// within 1 word, first container
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.Flip(uint64(650), uint64(132000))
 		rb.Flip(uint64(648), uint64(651))
 		rbcard := rb.GetCardinality()
@@ -985,7 +929,6 @@ func TestBitmapCOW(t *testing.T) {
 	t.Run("flipTestBig", func(t *testing.T) {
 		numCases := 1000
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		bs := bitset.New(0)
 		//Random r = new Random(3333);
 		checkTime := 2.0
@@ -1004,7 +947,6 @@ func TestBitmapCOW(t *testing.T) {
 			// insert some more ANDs to keep things sparser
 			if rand.Float64() < 0.2 {
 				mask := NewBitmap()
-				mask.SetCopyOnWrite(true)
 				mask1 := bitset.New(0)
 				startM := rand.Intn(65536 * 20)
 				endM := startM + 100000
@@ -1030,14 +972,12 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("ortest", func(t *testing.T) {
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		for k := 0; k < 4000; k++ {
 			rr.AddInt(k)
 		}
 		rr.AddInt(100000)
 		rr.AddInt(110000)
 		rr2 := NewBitmap()
-		rr2.SetCopyOnWrite(true)
 		for k := 0; k < 4000; k++ {
 			rr2.AddInt(k)
 		}
@@ -1054,7 +994,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("ORtest", func(t *testing.T) {
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		for k := 4000; k < 4256; k++ {
 			rr.AddInt(k)
 		}
@@ -1078,7 +1017,6 @@ func TestBitmapCOW(t *testing.T) {
 		}
 
 		rr2 := NewBitmap()
-		rr2.SetCopyOnWrite(true)
 		for k := 4000; k < 4256; k++ {
 			rr2.AddInt(k)
 		}
@@ -1108,7 +1046,6 @@ func TestBitmapCOW(t *testing.T) {
 		arrayrr := make([]uint64, 4000+4000+2)
 		pos := 0
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		for k := 0; k < 4000; k++ {
 			rr.AddInt(k)
 			arrayrr[pos] = uint64(k)
@@ -1117,7 +1054,6 @@ func TestBitmapCOW(t *testing.T) {
 		rr.AddInt(100000)
 		rr.AddInt(110000)
 		rr2 := NewBitmap()
-		rr2.SetCopyOnWrite(true)
 		for k := 4000; k < 8000; k++ {
 			rr2.AddInt(k)
 			arrayrr[pos] = uint64(k)
@@ -1140,9 +1076,7 @@ func TestBitmapCOW(t *testing.T) {
 		V2 := make(map[int]bool)
 
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		rr2 := NewBitmap()
-		rr2.SetCopyOnWrite(true)
 		for k := 0; k < 4000; k++ {
 			rr2.AddInt(k)
 			V1[k] = true
@@ -1217,9 +1151,7 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("ortest4", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb2 := NewBitmap()
-		rb2.SetCopyOnWrite(true)
 
 		for i := 0; i < 200000; i += 4 {
 			rb2.AddInt(i)
@@ -1265,7 +1197,6 @@ func TestBitmapCOW(t *testing.T) {
 		gap := 70
 
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		for k := 0; k < N; k++ {
 			rb.AddInt(k * gap)
 			assert.EqualValues(t, k+1, rb.GetCardinality())
@@ -1281,7 +1212,6 @@ func TestBitmapCOW(t *testing.T) {
 
 	t.Run("XORtest", func(t *testing.T) {
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		for k := 4000; k < 4256; k++ {
 			rr.AddInt(k)
 		}
@@ -1305,7 +1235,6 @@ func TestBitmapCOW(t *testing.T) {
 		}
 
 		rr2 := NewBitmap()
-		rr2.SetCopyOnWrite(true)
 		for k := 4000; k < 4256; k++ {
 			rr2.AddInt(k)
 		}
@@ -1335,9 +1264,7 @@ func TestBitmapCOW(t *testing.T) {
 		V2 := make(map[int]bool)
 
 		rr := NewBitmap()
-		rr.SetCopyOnWrite(true)
 		rr2 := NewBitmap()
-		rr2.SetCopyOnWrite(true)
 		// For the first 65536: rr2 has a bitmap container, and rr has
 		// an array container.
 		// We will check the union between a BitmapCintainer and an
@@ -1416,9 +1343,7 @@ func TestBitmapCOW(t *testing.T) {
 
 func TestXORtest4COW(t *testing.T) {
 	rb := NewBitmap()
-	rb.SetCopyOnWrite(true)
 	rb2 := NewBitmap()
-	rb2.SetCopyOnWrite(true)
 	counter := 0
 
 	for i := 0; i < 200000; i += 4 {
@@ -1485,7 +1410,6 @@ func rTestCOW(t *testing.T, N int) {
 	for gap := 1; gap <= 65536; gap *= 2 {
 		bs1 := bitset.New(0)
 		rb1 := NewBitmap()
-		rb1.SetCopyOnWrite(true)
 		for x := 0; x <= N; x += gap {
 			bs1.Set(uint(x))
 			rb1.AddInt(x)
@@ -1497,7 +1421,6 @@ func rTestCOW(t *testing.T, N int) {
 		for offset := 1; offset <= gap; offset *= 2 {
 			bs2 := bitset.New(0)
 			rb2 := NewBitmap()
-			rb2.SetCopyOnWrite(true)
 			for x := 0; x <= N; x += gap {
 				bs2.Set(uint(x + offset))
 				rb2.AddInt(x + offset)
@@ -1540,9 +1463,7 @@ func TestFlipBigACOW(t *testing.T) {
 	bs := bitset.New(0)
 	checkTime := 2.0
 	rb1 := NewBitmap()
-	rb1.SetCopyOnWrite(true)
 	rb2 := NewBitmap()
-	rb2.SetCopyOnWrite(true)
 
 	for i := 0; i < numCases; i++ {
 		start := rand.Intn(65536 * 20)
@@ -1567,7 +1488,6 @@ func TestFlipBigACOW(t *testing.T) {
 		// insert some more ANDs to keep things sparser
 		if (rand.Float64() < 0.2) && (i&1) == 0 {
 			mask := NewBitmap()
-			mask.SetCopyOnWrite(true)
 			mask1 := bitset.New(0)
 			startM := rand.Intn(65536 * 20)
 			endM := startM + 100000
@@ -1596,11 +1516,9 @@ func TestFlipBigACOW(t *testing.T) {
 func TestDoubleAddCOW(t *testing.T) {
 	t.Run("doubleadd ", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.AddRange(uint64(65533), uint64(65536))
 		rb.AddRange(uint64(65530), uint64(65536))
 		rb2 := NewBitmap()
-		rb2.SetCopyOnWrite(true)
 		rb2.AddRange(uint64(65530), uint64(65536))
 
 		assert.True(t, rb.Equals(rb2))
@@ -1611,11 +1529,9 @@ func TestDoubleAddCOW(t *testing.T) {
 
 	t.Run("doubleadd2 ", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.AddRange(uint64(65533), uint64(65536*20))
 		rb.AddRange(uint64(65530), uint64(65536*20))
 		rb2 := NewBitmap()
-		rb2.SetCopyOnWrite(true)
 		rb2.AddRange(uint64(65530), uint64(65536*20))
 
 		assert.True(t, rb.Equals(rb2))
@@ -1626,12 +1542,10 @@ func TestDoubleAddCOW(t *testing.T) {
 
 	t.Run("doubleadd3 ", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.AddRange(uint64(65533), uint64(65536*20+10))
 		rb.AddRange(uint64(65530), uint64(65536*20+10))
 
 		rb2 := NewBitmap()
-		rb2.SetCopyOnWrite(true)
 		rb2.AddRange(uint64(65530), uint64(65536*20+10))
 		assert.True(t, rb.Equals(rb2))
 		rb2.RemoveRange(uint64(65530), uint64(65536*20+1))
@@ -1641,7 +1555,6 @@ func TestDoubleAddCOW(t *testing.T) {
 
 	t.Run("doubleadd4 ", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.AddRange(uint64(65533), uint64(65536*20))
 		rb.RemoveRange(uint64(65533+5), uint64(65536*20))
 
@@ -1650,7 +1563,6 @@ func TestDoubleAddCOW(t *testing.T) {
 
 	t.Run("doubleadd5 ", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.AddRange(uint64(65533), uint64(65536*20))
 		rb.RemoveRange(uint64(65533+5), uint64(65536*20-5))
 
@@ -1659,7 +1571,6 @@ func TestDoubleAddCOW(t *testing.T) {
 
 	t.Run("doubleadd6 ", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.AddRange(uint64(65533), uint64(65536*20-5))
 		rb.RemoveRange(uint64(65533+5), uint64(65536*20-10))
 
@@ -1668,7 +1579,6 @@ func TestDoubleAddCOW(t *testing.T) {
 
 	t.Run("doubleadd7 ", func(t *testing.T) {
 		rb := NewBitmap()
-		rb.SetCopyOnWrite(true)
 		rb.AddRange(uint64(65533), uint64(65536*20+1))
 		rb.RemoveRange(uint64(65533+1), uint64(65536*20))
 
@@ -1677,14 +1587,11 @@ func TestDoubleAddCOW(t *testing.T) {
 
 	t.Run("AndNotBug01 ", func(t *testing.T) {
 		rb1 := NewBitmap()
-		rb1.SetCopyOnWrite(true)
 		rb1.AddRange(uint64(0), uint64(60000))
 		rb2 := NewBitmap()
-		rb2.SetCopyOnWrite(true)
 		rb2.AddRange(uint64(60000-10), uint64(60000+10))
 		rb2.AndNot(rb1)
 		rb3 := NewBitmap()
-		rb3.SetCopyOnWrite(true)
 		rb3.AddRange(uint64(60000), uint64(60000+10))
 
 		assert.True(t, rb2.Equals(rb3))
@@ -1693,7 +1600,6 @@ func TestDoubleAddCOW(t *testing.T) {
 
 func TestAndNotCOW(t *testing.T) {
 	rr := NewBitmap()
-	rr.SetCopyOnWrite(true)
 	for k := 4000; k < 4256; k++ {
 		rr.AddInt(k)
 	}
@@ -1717,7 +1623,6 @@ func TestAndNotCOW(t *testing.T) {
 	}
 
 	rr2 := NewBitmap()
-	rr2.SetCopyOnWrite(true)
 	for k := 4000; k < 4256; k++ {
 		rr2.AddInt(k)
 	}
@@ -1744,7 +1649,6 @@ func TestAndNotCOW(t *testing.T) {
 
 func TestFlipVerySmallCOW(t *testing.T) {
 	rb := NewBitmap()
-	rb.SetCopyOnWrite(true)
 	rb.Flip(uint64(0), uint64(10)) // got [0,9], card is 10
 	rb.Flip(uint64(0), uint64(1))  // give back the number 0, card goes to 9
 	rbcard := rb.GetCardinality()
