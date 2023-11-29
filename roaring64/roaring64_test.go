@@ -10,9 +10,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/RoaringBitmap/roaring"
 	"github.com/bits-and-blooms/bitset"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/RoaringBitmap/roaring"
 )
 
 func TestRoaringIntervalCheck(t *testing.T) {
@@ -2077,4 +2079,19 @@ func Test_tryReadFromRoaring32WithRoaring64_File(t *testing.T) {
 	assert.True(t, nr64.Contains(65535))
 	assert.True(t, nr64.Contains(math.MaxUint32))
 	assert.True(t, nr64.Contains(math.MaxUint64))
+}
+
+func TestUnsafeOr(t *testing.T) {
+	b1 := NewBitmap()
+	b2 := NewBitmap()
+	for i := uint64(0); i < 20000; i += 2 {
+		b1.Add(i)
+		b2.Add(i + 1)
+	}
+	b1.UnsafeOr(b2)
+	for i := uint64(0); i < 20000; i += 2 {
+		require.True(t, b1.Contains(i))
+	}
+	require.Equal(t, uint64(0), b2.GetCardinality())
+	require.Equal(t, 0, len(b2.highlowcontainer.containers))
 }

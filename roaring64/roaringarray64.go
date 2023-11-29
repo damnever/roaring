@@ -31,7 +31,7 @@ func (ra *roaringArray64) appendContainer(key uint32, value *roaring.Bitmap, mus
 }
 
 func (ra *roaringArray64) appendWithoutCopy(sa roaringArray64, startingindex int) {
-	mustCopyOnWrite := sa.needCopyOnWrite[startingindex]
+	mustCopyOnWrite := sa.needsCopyOnWrite(startingindex)
 	ra.appendContainer(sa.keys[startingindex], sa.containers[startingindex], mustCopyOnWrite)
 }
 

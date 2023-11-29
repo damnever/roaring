@@ -130,7 +130,7 @@ func (ra *roaringArray) appendContainer(key uint16, value container, mustCopyOnW
 }
 
 func (ra *roaringArray) appendWithoutCopy(sa roaringArray, startingindex int) {
-	mustCopyOnWrite := sa.needCopyOnWrite[startingindex]
+	mustCopyOnWrite := sa.needsCopyOnWrite(startingindex)
 	ra.appendContainer(sa.keys[startingindex], sa.containers[startingindex], mustCopyOnWrite)
 }
 
@@ -350,6 +350,10 @@ func (ra *roaringArray) getKeyAtIndex(i int) uint16 {
 }
 
 func (ra *roaringArray) insertNewKeyValueAt(i int, key uint16, value container) {
+	ra.insertNewKeyValueCopyOnWrite(i, key, value, false)
+}
+
+func (ra *roaringArray) insertNewKeyValueCopyOnWrite(i int, key uint16, value container, copyOnWrite bool) {
 	ra.keys = append(ra.keys, 0)
 	ra.containers = append(ra.containers, nil)
 
@@ -361,7 +365,7 @@ func (ra *roaringArray) insertNewKeyValueAt(i int, key uint16, value container) 
 
 	ra.needCopyOnWrite = append(ra.needCopyOnWrite, false)
 	copy(ra.needCopyOnWrite[i+1:], ra.needCopyOnWrite[i:])
-	ra.needCopyOnWrite[i] = false
+	ra.needCopyOnWrite[i] = copyOnWrite
 }
 
 func (ra *roaringArray) remove(key uint16) bool {

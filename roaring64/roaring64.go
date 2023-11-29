@@ -793,6 +793,52 @@ main:
 	}
 }
 
+// UnsafeOr computes the union between two bitmaps and stores the result in the current bitmap.
+// NOTE that after this operation, the bitmap x2 will no longer be usable.
+func (rb *Bitmap) UnsafeOr(x2 *Bitmap) {
+	pos1 := 0
+	pos2 := 0
+	length1 := rb.highlowcontainer.size()
+	length2 := x2.highlowcontainer.size()
+main:
+	for (pos1 < length1) && (pos2 < length2) {
+		s1 := rb.highlowcontainer.getKeyAtIndex(pos1)
+		s2 := x2.highlowcontainer.getKeyAtIndex(pos2)
+
+		for {
+			if s1 < s2 {
+				pos1++
+				if pos1 == length1 {
+					break main
+				}
+				s1 = rb.highlowcontainer.getKeyAtIndex(pos1)
+			} else if s1 > s2 {
+				rb.highlowcontainer.insertNewKeyValueAt(pos1, s2, x2.highlowcontainer.getContainerAtIndex(pos2))
+				pos1++
+				length1++
+				pos2++
+				if pos2 == length2 {
+					break main
+				}
+				s2 = x2.highlowcontainer.getKeyAtIndex(pos2)
+			} else {
+				rb.highlowcontainer.getContainerAtIndex(pos1).UnsafeOr(x2.highlowcontainer.getContainerAtIndex(pos2))
+				pos1++
+				pos2++
+				if (pos1 == length1) || (pos2 == length2) {
+					break main
+				}
+				s1 = rb.highlowcontainer.getKeyAtIndex(pos1)
+				s2 = x2.highlowcontainer.getKeyAtIndex(pos2)
+			}
+		}
+	}
+	if pos1 == length1 {
+		rb.highlowcontainer.appendWithoutCopyMany(x2.highlowcontainer, pos2, length2)
+	}
+	x2.Clear()
+}
+
 // AndNot computes the difference between two bitmaps and stores the result in the current bitmap
 func (rb *Bitmap) AndNot(x2 *Bitmap) {
 	pos1 := 0
