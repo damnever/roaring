@@ -10,9 +10,10 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/RoaringBitmap/roaring"
 	"github.com/bits-and-blooms/bitset"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/RoaringBitmap/roaring"
 )
 
 func TestRoaringIntervalCheck(t *testing.T) {
